@@ -19,6 +19,15 @@ namespace AirBreather.Core.Utilities
         //     ToStringUtility.Begin(typeof(MyType))
         //     ToStringUtility.Begin("MyType")
         // notice the lack of MyType in the generic-with-exemplar version.
+        //
+        // example usage (inside the Person.ToString() override):
+        //     return ToStringUtility.Begin(this)
+        //                           .AddProperty("FirstName", this.FirstName)
+        //                           .AddProperty("MiddleName", this.MiddleName)
+        //                           .AddProperty("LastName", this.LastName)
+        //                           .End();
+        // example output:
+        //     Person[FirstName=John, MiddleName=(null), LastName=Smith]
         public static IStringCreator Begin<T>(T exemplar)
         {
             return new Builder(typeof(T).Name);

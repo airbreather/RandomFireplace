@@ -1,14 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
-using System.Reactive.Linq;
-using System.Threading.Tasks;
+using System.Globalization;
+using System.Linq;
 
 using AirBreather.Core.Utilities;
 
 namespace RandomFireplace.Core
 {
-    public sealed class CardCatalog
+    public sealed class CardCatalog : ICardCatalog
     {
         private readonly string cardDatabaseConnectionString;
 
@@ -17,42 +18,68 @@ namespace RandomFireplace.Core
             this.cardDatabaseConnectionString = "DataSource=" + cardDatabasePath + ";Version=3";
         }
 
-        public IObservable<Card> FetchAllCards()
+        public IEnumerable<Card> FetchAllCards()
         {
             return Select("SELECT CardId, CardName FROM Card",
-                          async r => new Card(await r.GetFieldValueAsync<long>(0).ConfigureAwait(false),
-                                              await r.GetFieldValueAsync<string>(1).ConfigureAwait(false)));
+                          r => new Card(r.GetInt64(0), r.GetString(1)));
         }
 
-        public IObservable<Tag> FetchAllTags()
+        public IEnumerable<Tag> FetchAllTags()
         {
             return Select("SELECT TagId, TagName FROM Tag",
-                          async r => new Tag(await r.GetFieldValueAsync<long>(0).ConfigureAwait(false),
-                                             await r.GetFieldValueAsync<string>(1).ConfigureAwait(false)));
+                          r => new Tag(r.GetInt64(0), r.GetString(1)));
         }
 
-        public IObservable<CardWithMetadata> FetchAllCardMetadata()
+        // This is probably going away soon.
+        // Other than ease of me getting an initial thing working quickly,
+        // there's no need for this once we have FetchCardMetadatForTagIds.
+        public IEnumerable<CardMetadata> FetchAllCardMetadata()
         {
             return Select("SELECT CardId, TagId FROM Metadata",
-                          async r => new CardWithMetadata(await r.GetFieldValueAsync<long>(0).ConfigureAwait(false),
-                                                          await r.GetFieldValueAsync<long>(1).ConfigureAwait(false)));
+                          r => new CardMetadata(r.GetInt64(0), r.GetInt64(1)));
         }
 
-        private IObservable<T> Select<T>(string selectQuery, Func<SQLiteDataReader, Task<T>> selector)
+        public IEnumerable<CardMetadata> FetchCardMetadataForTagIds(IEnumerable<long> tagIds)
         {
-            return Observable.Using(() => new SQLiteConnection(this.cardDatabaseConnectionString),
-                                    conn =>
-                                    {
-                                        conn.Open();
-                                        return Observable.Using(() => new SQLiteCommand(conn),
-                                                                selectCommand =>
-                                                                {
-                                                                    selectCommand.CommandType = CommandType.Text;
-                                                                    selectCommand.CommandText = selectQuery;
-                                                                    return Observable.Using(selectCommand.ExecuteReader,
-                                                                                            reader => reader.ToObservable().Select(selector).Merge());
-                                                                });
-                                    });
+            if (tagIds == null)
+            {
+                throw new ArgumentNullException("tagIds");
+            }
+
+            // This was using ToHashSet to make extra-special-sure that we only
+            // return metadata with the given tags, even if SQLite doesn't
+            // filter properly... but if we can't trust SQLite, then we're not
+            // exactly in fantastic shape anyway, now, are we?
+            string filter = String.Join(",", tagIds.Select(x => x.ToString(CultureInfo.InvariantCulture)));
+
+            if (filter.Length == 0)
+            {
+                // No need to run a query that we know will return no values.
+                return Enumerable.Empty<CardMetadata>();
+            }
+
+            return Select("SELECT CardId, TagId FROM Metadata WHERE TagId IN (" + filter + ")",
+                          r => new CardMetadata(r.GetInt64(0), r.GetInt64(1)));
+        }
+
+        private IEnumerable<T> Select<T>(string selectQuery, Func<IDataReader, T> selector)
+        {
+            using (var conn = new SQLiteConnection(this.cardDatabaseConnectionString))
+            using (var selectCommand = new SQLiteCommand(conn))
+            {
+                selectCommand.CommandType = CommandType.Text;
+                selectCommand.CommandText = selectQuery;
+                conn.Open();
+                using (var reader = selectCommand.ExecuteReader())
+                {
+                    // Important: do not just return .ToEnumerable().Select(selector) here.
+                    // That would dispose the things too early.
+                    foreach (var result in reader.ToEnumerable().Select(selector))
+                    {
+                        yield return result;
+                    }
+                }
+            }
         }
     }
 }

@@ -22,5 +22,15 @@ namespace AirBreather.Core.Utilities
             // so use that instead of re-implementing it.
             return enumerable.Where(x => !predicate(x));
         }
+
+        public static HashSet<T> ToHashSet<T>(this IEnumerable<T> enumerable)
+        {
+            return enumerable.ToHashSet(null);
+        }
+
+        public static HashSet<T> ToHashSet<T>(this IEnumerable<T> enumerable, IEqualityComparer<T> equalityComparer)
+        {
+            return new HashSet<T>(enumerable, equalityComparer);
+        }
     }
 }

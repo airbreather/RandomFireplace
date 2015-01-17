@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Reactive.Linq;
 
 using AirBreather.Core.Utilities;
 
@@ -33,13 +32,11 @@ namespace RandomFireplace
             string filePath = Console.ReadLine();
 
             var catalog = new CardCatalog(filePath);
-            IDictionary<long, Card> cardMapping = catalog.FetchAllCards()
-                                                         .ToDictionary(card => card.CardId)
-                                                         .Wait();
+            Dictionary<long, Card> cardMapping = catalog.FetchAllCards()
+                                                        .ToDictionary(card => card.CardId);
 
-            IDictionary<long, Tag> tagMapping = catalog.FetchAllTags()
-                                                       .ToDictionary(tag => tag.TagId)
-                                                       .Wait();
+            Dictionary<long, Tag> tagMapping = catalog.FetchAllTags()
+                                                      .ToDictionary(tag => tag.TagId);
 
             Console.WriteLine("The following are the ids of all tags.  Select the ids of tags to include in the pool, comma-separated (e.g.: \"6,8\"):");
             foreach (var tag in tagMapping.Values
@@ -51,13 +48,11 @@ namespace RandomFireplace
             HashSet<long> tagIds = new HashSet<long>(Console.ReadLine().Split(',').Select(x => Int64.Parse(x, NumberStyles.None, CultureInfo.InvariantCulture)));
 
             ILookup<long, long> cardIdToTagIdsLookup = catalog.FetchAllCardMetadata()
-                                                              .ToLookup(metadata => metadata.CardId, metadata => metadata.TagId)
-                                                              .Wait();
+                                                              .ToLookup(metadata => metadata.CardId, metadata => metadata.TagId);
 
             long[] includedCardIds = cardIdToTagIdsLookup.Where(grp => grp.Any(tagIds.Contains))
                                                          .Select(grp => grp.Key)
                                                          .Distinct()
-                                                         .OrderBy(_ => Guid.NewGuid())
                                                          .ToArray();
 
             long commonTagId = tagMapping.Values.Single(tag => String.Equals("common", tag.TagName, StringComparison.OrdinalIgnoreCase)).TagId;
@@ -65,7 +60,7 @@ namespace RandomFireplace
             long epicTagId = tagMapping.Values.Single(tag => String.Equals("epic", tag.TagName, StringComparison.OrdinalIgnoreCase)).TagId;
             long legendaryTagId = tagMapping.Values.Single(tag => String.Equals("legendary", tag.TagName, StringComparison.OrdinalIgnoreCase)).TagId;
 
-            ILookup<long, long> rarityTagIdToIncludedCardIdsLookup = includedCardIds.SelectMany(cardId => cardIdToTagIdsLookup[cardId].Select(tagId => new CardWithMetadata(cardId, tagId)))
+            ILookup<long, long> rarityTagIdToIncludedCardIdsLookup = includedCardIds.SelectMany(cardId => cardIdToTagIdsLookup[cardId].Select(tagId => new CardMetadata(cardId, tagId)))
                                                                                     .Where(metadata => metadata.TagId == commonTagId ||
                                                                                                        metadata.TagId == rareTagId ||
                                                                                                        metadata.TagId == epicTagId ||

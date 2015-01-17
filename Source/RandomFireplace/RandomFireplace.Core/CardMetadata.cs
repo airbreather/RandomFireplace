@@ -4,7 +4,7 @@ using AirBreather.Core.Utilities;
 
 namespace RandomFireplace.Core
 {
-    public struct CardWithMetadata : IEquatable<CardWithMetadata>
+    public struct CardMetadata : IEquatable<CardMetadata>
     {
         // purposely not making these readonly
         // I know the perf difference is practically negligible -- when you make your own
@@ -13,7 +13,7 @@ namespace RandomFireplace.Core
 
         private long tagId;
 
-        public CardWithMetadata(long cardId, long tagId)
+        public CardMetadata(long cardId, long tagId)
         {
             this.cardId = cardId;
             this.tagId = tagId;
@@ -25,11 +25,11 @@ namespace RandomFireplace.Core
 
         public override bool Equals(object obj)
         {
-            return obj is CardWithMetadata &&
-                   this.Equals((CardWithMetadata)obj);
+            return obj is CardMetadata &&
+                   this.Equals((CardMetadata)obj);
         }
 
-        public bool Equals(CardWithMetadata other)
+        public bool Equals(CardMetadata other)
         {
             return this.cardId == other.cardId &&
                    this.tagId == other.tagId;
